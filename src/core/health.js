@@ -33,7 +33,7 @@ async function checkForUpdate() {
           update_available: remoteSha !== localSha,
           local_commit: localSha.slice(0, 8),
           latest_commit: remoteSha.slice(0, 8),
-          ...(remoteSha !== localSha && { hint: 'Run `git pull` and restart the MCP server to update.' }),
+          ...(remoteSha !== localSha && { hint: 'Run the tv_update tool (or `tv update` CLI) to update, then restart the MCP server.' }),
         };
       }
     }
