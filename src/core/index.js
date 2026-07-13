@@ -14,3 +14,7 @@ export * as batch from './batch.js';
 export * as watchlist from './watchlist.js';
 export * as indicators from './indicators.js';
 export * as ui from './ui.js';
+export * as backtest from './backtest.js';
+export * as stock from './stock.js';
+export * as pattern from './pattern.js';
+export * as screener from './screener.js';

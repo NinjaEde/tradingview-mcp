@@ -44,10 +44,12 @@ export async function setSymbol({ symbol, _deps }) {
       var chart = ${CHART_API};
       return new Promise(function(resolve) {
         chart.setSymbol(${safeString(symbol)}, {});
-        setTimeout(resolve, 500);
+        resolve();
       });
     })()
   `);
+  // waitForChartReady already confirms the symbol switched + bars are stable,
+  // so no blind setTimeout is needed here.
   const ready = await waitForChartReady(symbol);
   return { success: true, symbol, chart_ready: ready };
 }
@@ -196,7 +198,8 @@ export async function scrollToDate({ date }) {
   return { success: true, date, centered_on: timestamp, resolution, window: { from, to } };
 }
 
-export async function symbolInfo() {
+export async function symbolInfo({ _deps } = {}) {
+  const { evaluate } = _resolve(_deps);
   const result = await evaluate(`
     (function() {
       var chart = ${CHART_API};

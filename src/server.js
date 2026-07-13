@@ -14,7 +14,10 @@ import { registerWatchlistTools } from './tools/watchlist.js';
 import { registerUiTools } from './tools/ui.js';
 import { registerPaneTools } from './tools/pane.js';
 import { registerTabTools } from './tools/tab.js';
-
+import { registerBacktestTools } from './tools/backtest.js';
+import { registerStockTools } from './tools/stock.js';
+import { registerPatternTools } from './tools/pattern.js';
+import { registerScreenerTools } from './tools/screener.js';
 const server = new McpServer(
   {
     name: 'tradingview',
@@ -22,7 +25,7 @@ const server = new McpServer(
     description: 'AI-assisted TradingView chart analysis and Pine Script development via Chrome DevTools Protocol',
   },
   {
-    instructions: `TradingView MCP — 78 tools for reading and controlling a live TradingView Desktop chart.
+    instructions: `TradingView MCP — tools for reading and controlling a live TradingView Desktop chart via CDP.
 
 TOOL SELECTION GUIDE — use this to pick the right tool:
 
@@ -45,6 +48,36 @@ Changing the chart:
 - chart_manage_indicator → add/remove studies. USE FULL NAMES: "Relative Strength Index" not "RSI"
 - chart_scroll_to_date → jump to a date (ISO format)
 - indicator_set_inputs → change indicator settings (length, source, etc.)
+
+Technical Analysis (Pattern Recognition):
+- chart_get_technicals_summary → complete technical analysis (SMA, BB, RSI, MACD, momentum)
+- chart_detect_patterns → Double Top/Bottom, Head & Shoulders, Triangles, Flags
+- chart_detect_divergences → RSI/MACD/CCI divergences
+- chart_find_support_resistance → key S/R levels from swing highs/lows
+- chart_analyze_trendlines → trendline slope, angle, validity
+
+Stock Comparison & Multi-Symbol:
+- stock_compare → relative performance of multiple symbols
+- stock_correlation → correlation matrix between symbols
+- stock_relative_strength → RS vs benchmark (SPY)
+- stock_sector_rotation → sector relative strength analysis
+- stock_batch_technicals → technicals for multiple symbols
+
+Backtesting (requires strategy on chart):
+- backtest_summary → Sharpe, Sortino, Calmar, Win Rate, etc.
+- backtest_trade_analysis → trade-level stats (avg win, R:R, expectancy)
+- backtest_equity_analysis → equity curve, drawdown periods
+- backtest_monte_carlo → risk modeling (1000+ simulations)
+- backtest_export_trades → export trades as JSON/CSV
+- strategy_optimize → parameter sweep for strategy inputs
+
+Fundamental Data (requires Premium):
+- stock_get_financials → Income Statement, Balance Sheet, Cash Flow
+- stock_get_key_metrics → P/E, P/B, margins, ROE, ROA, debt ratios
+- stock_get_profile → sector, industry, employees, description
+- stock_get_ownership → institutional holders, insider activity
+- stock_get_earnings → EPS history, estimates, surprise %
+- stock_get_dividends → yield, growth, history
 
 Pine Script development:
 - pine_set_source → inject code, pine_smart_compile → compile + check errors
@@ -84,7 +117,10 @@ registerWatchlistTools(server);
 registerUiTools(server);
 registerPaneTools(server);
 registerTabTools(server);
-
+registerBacktestTools(server);
+registerStockTools(server);
+registerPatternTools(server);
+registerScreenerTools(server);
 // Startup notice (stderr so it doesn't interfere with MCP stdio protocol)
 process.stderr.write('⚠  tradingview-mcp  |  Unofficial tool. Not affiliated with TradingView Inc. or Anthropic.\n');
 process.stderr.write('   Ensure your usage complies with TradingView\'s Terms of Use.\n\n');

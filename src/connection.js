@@ -160,6 +160,48 @@ export async function getReplayApi() {
   return verifyAndReturn(KNOWN_PATHS.replayApi, 'Replay API');
 }
 
-export async function getMainSeriesBars() {
-  return verifyAndReturn(KNOWN_PATHS.mainSeriesBars, 'Main Series Bars');
+/**
+ * Connect to a CDP target selected by a predicate, and evaluate JS in its context.
+ * Used for non-chart targets (e.g. the TradingView Screener tab) whose URL does
+ * not match the chart heuristic used by findChartTarget(). Non-breaking: the
+ * existing chart client path is untouched.
+ */
+const targetClients = new Map(); // targetId -> CDP client
+
+export async function findTarget(predicate) {
+  const resp = await fetch(`http://${CDP_HOST}:${CDP_PORT}/json/list`);
+  const targets = await resp.json();
+  return targets.find(predicate) || null;
+}
+
+export async function evaluateOnTarget(predicate, expression, opts = {}) {
+  const target = await findTarget(predicate);
+  if (!target) {
+    throw new Error('No matching CDP target found for the given predicate.');
+  }
+  let client = targetClients.get(target.id);
+  if (!client) {
+    client = await CDP({ host: CDP_HOST, port: CDP_PORT, target: target.id });
+    await client.Runtime.enable();
+    await client.DOM.enable();
+    targetClients.set(target.id, client);
+  }
+  const result = await client.Runtime.evaluate({
+    expression,
+    returnByValue: true,
+    awaitPromise: opts.awaitPromise ?? false,
+    ...opts,
+  });
+  if (result.exceptionDetails) {
+    const msg = result.exceptionDetails.exception?.description
+      || result.exceptionDetails.text
+      || 'Unknown evaluation error';
+    throw new Error(`JS evaluation error: ${msg}`);
+  }
+  return result.result?.value;
+}
+
+export async function listTargets() {
+  const resp = await fetch(`http://${CDP_HOST}:${CDP_PORT}/json/list`);
+  return resp.json();
 }
