@@ -50,34 +50,6 @@ function parsePct(s) {
   return Number.isFinite(n) ? n : null;
 }
 
-function extractSymbol(tr) {
-  const a = tr.querySelector('a[href*="/symbols/"]');
-  if (a) {
-    const m = (a.getAttribute('href') || '').match(/symbols\/([^/]+)\//);
-    if (m) return m[1].replace(/^.*-/, ''); // strip exchange prefix -> ticker
-  }
-  // Fallback: first cell text often "TICKER Name"
-  const first = tr.querySelector('td');
-  if (first) {
-    const t = (first.textContent || '').trim();
-    const m = t.match(/^([A-Z0-9.]{1,8})\s/);
-    if (m) return m[1];
-  }
-  return null;
-}
-
-function cellFragments(td) {
-  const frags = [];
-  td.querySelectorAll('*').forEach((el) => {
-    const child = el.childNodes && el.childNodes[0];
-    if (child && child.nodeType === 3 && child.textContent.trim()) frags.push(child.textContent.trim());
-  });
-  const direct = Array.from(td.childNodes)
-    .filter((n) => n.nodeType === 3 && n.textContent.trim())
-    .map((n) => n.textContent.trim());
-  return (frags.join(' ').trim() || direct.join(' ').trim());
-}
-
 export async function getScreener({ sort_by = 'change_pct', limit = 20, gainers_only = false, losers_only = false } = {}) {
   const raw = await evaluateOnTarget(SCREENER_PREDICATE, `
     (function() {

@@ -9,13 +9,11 @@
  * computeRelativeStrength, computeCorrelationMatrix, computeBatchTechnicals) are exported
  * so they can be unit-tested without a live TradingView connection.
  */
-import { evaluate, evaluateAsync, KNOWN_PATHS, safeString } from '../connection.js';
+import { evaluate, KNOWN_PATHS } from '../connection.js';
 import { setSymbol } from './chart.js';
-import { waitForChartReady } from '../wait.js';
 import { getOhlcv as getOhlcvCore } from './data.js';
 
 const CHART_API = KNOWN_PATHS.chartApi;
-const BARS_PATH = KNOWN_PATHS.mainSeriesBars;
 
 const SWITCH_DELAY_MS = 600;
 
