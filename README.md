@@ -14,6 +14,62 @@ Personal AI assistant for your TradingView Desktop charts. Connects Claude Code 
 > [!CAUTION]
 > This tool accesses undocumented internal TradingView APIs via the Electron debug interface. These can change or break without notice in any TradingView update. Pin your TradingView Desktop version if stability matters to you.
 
+## Custom Pine Script Indicators
+
+This project includes custom Pine Script indicators for advanced technical analysis:
+
+### Ede - Advanced SMC v2.0
+
+A comprehensive Smart Money Concepts (SMC) indicator combining multiple analysis techniques:
+
+**Features:**
+- **Order Blocks (OB)** — Identifies institutional order blocks with configurable lookback period
+- **Fair Value Gaps (FVG)** — Detects unfilled price gaps indicating institutional activity
+- **Fibonacci Levels** — Dynamic 50% level based on 50-bar high/low range
+- **EMA Confluence** — 20/50/200 EMAs with trend detection
+- **Liquidity Sweeps** — Detects when price sweeps swing highs/lows
+- **BOS & CHoCH** — Break of Structure and Change of Character detection
+- **Pattern Detection** — Double Top/Bottom pattern recognition
+- **Divergence Detection** — RSI/MACD/CCI hidden and regular divergences
+- **RSI Panel** — Separate pane with RSI line and overbought/oversold levels
+- **Enhanced Dashboard** — Multi-check validation (discount/premium zone, EMA confluence, liquidity, signals)
+
+**Signal Labels:**
+- LIQ — Liquidity sweep detected
+- BUY — Entry signal (discount zone + EMA confluence + BOS/liq)
+- EXIT — Exit signal (CHoCH or EMA crossover)
+- BOS — Break of Structure confirmed
+- CHoCH — Change of Character (structure shift)
+- DIV+ / DIV- — Bullish/Bearish divergence
+
+**Visual Markers:**
+- 🟢 Green boxes = Bullish Order Blocks / FVGs
+- 🔴 Red zones = Premium areas
+- 📊 Color-coded dashboard with status checks
+
+### SMC-MA-Confluence-v1.2
+
+A simpler version focused on:
+- Order Block detection
+- EMA 20/50/200 confluence
+- Liquidity sweep detection
+- Entry/exit signals
+
+### Usage
+
+1. Open TradingView Desktop
+2. Go to Pine Editor (bottom panel)
+3. Copy the indicator code from the `.pine` files
+4. Add to chart
+
+### MCP Integration
+
+These indicators are designed to work with the MCP tools:
+- `data_get_pine_lines` — Read key price levels
+- `data_get_pine_labels` — Read signal labels (BUY, EXIT, BOS, etc.)
+- `data_get_pine_boxes` — Read OB/FVG zones
+- `data_get_pine_tables` — Read dashboard values
+
 ## How It Works (and why it's safe to run)
 
 This tool does not connect to TradingView's servers, modify any TradingView files, or intercept any network traffic. It communicates exclusively with your locally running TradingView Desktop instance via Chrome DevTools Protocol (CDP) — a standard debugging interface built into all Chromium/Electron applications by Google, including VS Code, Slack, and Discord.
@@ -56,7 +112,10 @@ See [RESEARCH.md](RESEARCH.md) for open questions, findings, and related work.
 
 Gives your AI assistant eyes and hands on your own chart:
 
+- **Multi-symbol stock analysis** — real per-symbol chart switching for comparison, relative strength, technical snapshots, and correlation (no simulated data)
+- **Live screener scan** — read the open TradingView Screener tab for ranked gainers/losers by % change
 - **Pine Script development** — write, inject, compile, debug, and iterate on scripts with AI assistance
+- **Custom indicators** — pre-built SMC indicators with pattern detection, divergences, and dashboards
 - **Chart navigation** — change symbols, timeframes, zoom to dates, add/remove indicators
 - **Visual analysis** — read your chart's indicator values, price levels, and annotations
 - **Draw on charts** — trend lines, horizontal lines, rectangles, text annotations
@@ -208,6 +267,8 @@ Claude reads [`CLAUDE.md`](CLAUDE.md) automatically when working in this project
 | "What levels are showing?" | `data_get_pine_lines` → `data_get_pine_labels` |
 | "Read the session table" | `data_get_pine_tables` with `study_filter` |
 | "Give me a full analysis" | `quote_get` → `data_get_study_values` → `data_get_pine_lines` → `data_get_pine_labels` → `data_get_pine_tables` → `data_get_ohlcv` (summary) → `capture_screenshot` |
+| "What signals are showing?" | `data_get_pine_labels` with `study_filter: "Ede"` → `data_get_pine_boxes` |
+| "Check entry/exit signals" | `data_get_pine_labels` for BUY, EXIT, BOS, CHoCH labels |
 | "Switch to AAPL daily" | `chart_set_symbol` → `chart_set_timeframe` |
 | "Write a Pine Script for..." | `pine_set_source` → `pine_smart_compile` → `pine_get_errors` |
 | "Start replay at March 1st" | `replay_start` → `replay_step` → `replay_trade` |
@@ -215,7 +276,7 @@ Claude reads [`CLAUDE.md`](CLAUDE.md) automatically when working in this project
 | "Draw a level at 24500" | `draw_shape` (horizontal_line) |
 | "Take a screenshot" | `capture_screenshot` |
 
-## Tool Reference (78 MCP tools)
+## Tool Reference (MCP tools)
 
 ### Chart Reading
 
@@ -294,6 +355,17 @@ Read `line.new()`, `label.new()`, `table.new()`, `box.new()` output from any vis
 | `replay_trade` | Buy/sell/close positions |
 | `replay_status` | Check position, P&L, date |
 | `replay_stop` | Return to realtime |
+
+### Stock Analysis (real data, per-symbol chart switching)
+| Tool | What it does |
+|------|-------------|
+| `screener_get` | Read the open TradingView Screener tab; returns ranked rows (gainers/losers) by % change, with price, volume, market cap, PE, sector |
+| `stock_compare` | Real relative-performance ranking of multiple symbols (each loaded on the chart, ranked by % change) |
+| `stock_batch_technicals` | Technical snapshot (SMA20/50, Bollinger, ATR, trend, 1d change, 10d momentum) per symbol |
+| `stock_relative_strength` | RS of a symbol vs a benchmark (e.g. BAYN vs SPY) — real returns |
+| `stock_correlation` | Correlation matrix from real daily returns (pearson/spearman) |
+
+> **No simulated data.** Every `stock_*` tool switches the active chart to each symbol and reads its actual bars. Multi-symbol loops are optimized (single `waitForChartReady` per switch + in-memory bar cache) — a 4-symbol basket returns in ~1.5s.
 
 ### Drawing, Alerts, UI Automation
 
