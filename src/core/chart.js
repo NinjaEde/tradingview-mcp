@@ -2,7 +2,7 @@
  * Core chart control logic.
  */
 import { evaluate as _evaluate, evaluateAsync as _evaluateAsync, safeString, requireFinite } from '../connection.js';
-import { waitForChartReady as _waitForChartReady } from '../wait.js';
+import { waitForChartReady as _waitForChartReady, getLastBarFingerprint as _getLastBarFingerprint } from '../wait.js';
 
 const CHART_API = 'window.TradingViewApi._activeChartWidgetWV.value()';
 
@@ -40,27 +40,35 @@ export async function getState({ _deps } = {}) {
 export async function setSymbol({ symbol, _deps }) {
   // _deps is optional: callers that import setSymbol directly (getOhlcv,
   // fetchBarsForSymbol) don't thread it. Fall back to direct imports.
-  const { evaluateAsync, waitForChartReady } = _deps
+  const { evaluateAsync, waitForChartReady, getLastBarFingerprint } = _deps
     ? _resolve(_deps)
-    : { evaluateAsync: _evaluateAsync, waitForChartReady: _waitForChartReady };
+    : { evaluateAsync: _evaluateAsync, waitForChartReady: _waitForChartReady, getLastBarFingerprint: _getLastBarFingerprint };
   let ready = false;
+  // Capture the current symbol's last-bar fingerprint BEFORE switching, so we
+  // can detect (after the switch) that the chart has actually loaded the NEW
+  // symbol's bars and isn't still showing the previous symbol's data.
+  const prevFingerprint = await getLastBarFingerprint();
   // Retry: TradingView sometimes takes >1 switch attempt, especially
   // when the chart is mid-render. Without retry a single timeout
-  // leaves us reading the PREVIOUS symbol's bars.
+  // leaves us reading the PREVIOUS symbol's bars. Each attempt fires
+  // setSymbol + waits for the chart to actually load THAT symbol.
   for (let attempt = 0; attempt < 3 && !ready; attempt++) {
-    await evaluateAsync(`
-      (function() {
+    await evaluateAsync(`(function() {
         var chart = ${CHART_API};
         return new Promise(function(resolve) {
           chart.setSymbol(${safeString(symbol)}, {});
           resolve();
         });
-      })()
-    `);
-    ready = await waitForChartReady(symbol);
+      })()`);
+    // waitForChartReady(symbol, prevFingerprint) verifies against symbolExt()
+    // AND requires the bars to have CHANGED away from the previous symbol's
+    // data, so it only returns true once the NEW symbol's bars are actually
+    // on the chart (not the old ones that briefly remain after the switch).
+    ready = await waitForChartReady(symbol, null, undefined, prevFingerprint);
   }
   return { success: true, symbol, chart_ready: ready };
 }
+
 
 export async function setTimeframe({ timeframe, _deps }) {
   const { evaluate, waitForChartReady } = _resolve(_deps);

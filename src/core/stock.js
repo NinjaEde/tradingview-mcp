@@ -229,11 +229,14 @@ async function fetchBarsForSymbol(symbol, count, timeframe = 'D') {
   // Always wait for the chart to re-render the new symbol's bars, not just
   // on the timeout path — reading bars too early reads the PREVIOUS symbol.
   if (!chart_ready) await new Promise(r => setTimeout(r, SWITCH_DELAY_MS));
-  await waitForChartReady();
+  await waitForChartReady(sym);
   // If the chart still isn't on `sym` after retries, fail loudly instead of
-  // returning the WRONG symbol's bars (stale-cache bug class).
-  const active = await evaluate(`${CHART_API}.symbol()`).catch(() => null);
-  if (!active || active.toUpperCase() !== sym.toUpperCase()) {
+  // returning the WRONG symbol's bars (stale-cache bug class). Verify against
+  // symbolExt().symbol (the actually-loaded instrument), not chart.symbol()
+  // which can lag mid-switch.
+  const active = await evaluate(`(function(){ try { return (${CHART_API}.symbolExt()||{}).symbol || ${CHART_API}.symbol(); } catch(e){ return null; } })()`).catch(() => null);
+  const norm = (s) => (s || '').split(':').pop().replace(/_DLY$/, '').replace(/^[0-9]/, '').toUpperCase();
+  if (!active || norm(active) !== norm(sym)) {
     throw new Error(`Chart did not switch to ${sym} (still on ${active || 'unknown'})`);
   }
   const bars = getActiveBars(count);

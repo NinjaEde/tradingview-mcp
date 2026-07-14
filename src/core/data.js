@@ -142,11 +142,13 @@ export async function getOhlcv({ count, summary, symbol } = {}) {
   if (symbol && symbol.trim()) {
     try {
       await setSymbol({ symbol: symbol.trim() });
-      await waitForChartReady();
-      // Verify the chart actually switched — if setSymbol failed (e.g. TV
-      // rejected the ticker), reading bars would return the WRONG symbol.
-      const active = await evaluate(`${CHART_API}.symbol()`).catch(() => null);
-      if (!active || active.toUpperCase() !== symbol.trim().toUpperCase()) {
+      // waitForChartReady(symbol) already verified the chart loaded THIS
+      // symbol (via symbolExt) with present+stable bars. Re-check here as a
+      // hard guard: if it still reports the wrong symbol, fail loudly
+      // instead of returning the wrong symbol's bars.
+      const active = await evaluate(`(function(){ try { return (${CHART_API}.symbolExt()||{}).symbol || ${CHART_API}.symbol(); } catch(e){ return null; } })()`).catch(() => null);
+      const norm = (s) => (s || '').split(':').pop().replace(/_DLY$/, '').replace(/^[0-9]/, '').toUpperCase();
+      if (!active || norm(active) !== norm(symbol.trim())) {
         throw new Error(`Chart did not switch to ${symbol} (still on ${active || 'unknown'})`);
       }
     } catch (e) {

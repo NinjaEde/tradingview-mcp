@@ -3,11 +3,12 @@ import { jsonResult } from './_format.js';
 import * as core from '../core/data.js';
 
 export function registerDataTools(server) {
-  server.tool('data_get_ohlcv', 'Get OHLCV bar data from the chart. Use summary=true for compact stats instead of all bars (saves context).', {
+  server.tool('data_get_ohlcv', 'Get OHLCV bar data from the chart. If a symbol is provided, the chart switches to that symbol first and reads ITS bars (not whatever chart is open). Use summary=true for compact stats instead of all bars (saves context).', {
+    symbol: z.string().optional().describe('Symbol to load on the chart before reading bars (e.g. "AAPL", "XETR:BAS"). When omitted, reads the currently active chart symbol.'),
     count: z.coerce.number().optional().describe('Number of bars to retrieve (max 500, default 100)'),
     summary: z.coerce.boolean().optional().describe('Return summary stats (high, low, open, close, avg volume, range) instead of all bars — much smaller output'),
-  }, async ({ count, summary }) => {
-    try { return jsonResult(await core.getOhlcv({ count, summary })); }
+  }, async ({ symbol, count, summary }) => {
+    try { return jsonResult(await core.getOhlcv({ symbol, count, summary })); }
     catch (err) { return jsonResult({ success: false, error: err.message }, true); }
   });
 
