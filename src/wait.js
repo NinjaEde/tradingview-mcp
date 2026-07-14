@@ -127,7 +127,7 @@ export async function waitForChartReady(expectedSymbol = null, expectedTf = null
           await new Promise(r => setTimeout(r, POLL_INTERVAL));
           continue;
         }
-      } catch (e) { /* ignore tf check failure */ }
+      } catch { /* ignore tf check failure */ }
     }
 
     // Bar-count stability (2 consecutive identical, non-zero counts).

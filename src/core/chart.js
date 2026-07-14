@@ -11,6 +11,7 @@ function _resolve(deps) {
     evaluate: deps?.evaluate || _evaluate,
     evaluateAsync: deps?.evaluateAsync || _evaluateAsync,
     waitForChartReady: deps?.waitForChartReady || _waitForChartReady,
+    getLastBarFingerprint: deps?.getLastBarFingerprint || _getLastBarFingerprint,
   };
 }
 
