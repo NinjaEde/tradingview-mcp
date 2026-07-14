@@ -11,6 +11,10 @@
  *   - symbol: a[href*="/symbols/<EXCHANGE>-<TICKER>/"] inside the first cell
  *   - cells:  td with nested text fragments (virtualized grid)
  *   - header: th elements in document order
+ *
+ * NOTE: the Screener tab can show STALE data if it has not been refreshed
+ * (it caches the % change from when the tab was loaded). Prefer
+ * stock_momentum_screen / stock_batch_technicals for live momentum.
  */
 import { evaluateOnTarget } from '../connection.js';
 
@@ -66,9 +70,16 @@ export async function getScreener({ sort_by = 'change_pct', limit = 20, gainers_
           return (frags.join(' ').trim() || direct.join(' ').trim());
         });
         var sym = null;
+        var symFull = null;
         var a = tr.querySelector('a[href*="/symbols/"]');
-        if (a) { var m = (a.getAttribute('href')||'').match(/symbols\\/([^/]+)\\//); if (m) sym = m[1].replace(/^.*-/, ''); }
-        return { symbol: sym, cells: cells };
+        if (a) {
+          var m = (a.getAttribute('href')||'').match(/symbols\\/([^/]+)\\//);
+          if (m) {
+            symFull = m[1];                 // e.g. "NASDAQ:MRVL" — keeps exchange to avoid ambiguity
+            sym = symFull.replace(/^.*-/, ''); // ticker only: "MRVL"
+          }
+        }
+        return { symbol: sym, symbol_full: symFull, cells: cells };
       }).filter(function(r){ return r.symbol && r.cells.length; });
       return { headers: headers, data: data, rowCount: rows.length };
     })()
@@ -94,6 +105,7 @@ export async function getScreener({ sort_by = 'change_pct', limit = 20, gainers_
   const results = raw.data.map((r) => {
     const get = (key) => (headerMap[key] !== undefined ? r.cells[headerMap[key]] : null);
     const row = { symbol: r.symbol };
+    if (r.symbol_full) row.symbol_full = r.symbol_full;
     if (headerMap.price !== undefined) row.price = parseNumberOrNull(get('price'));
     if (headerMap.change_pct !== undefined) row.change_pct = parsePct(get('change_pct'));
     if (headerMap.volume !== undefined) row.volume = get('volume');
@@ -131,8 +143,9 @@ export async function getScreener({ sort_by = 'change_pct', limit = 20, gainers_
     total_rows_scraped: raw.data.length,
     headers: raw.headers,
     sorted_by: sortKey,
-    top_gainers: results.filter((r) => r.change_pct != null && r.change_pct > 0).slice(0, 5).map((r) => ({ symbol: r.symbol, change_pct: r.change_pct })),
-    top_losers: results.filter((r) => r.change_pct != null && r.change_pct < 0).slice(-5).reverse().map((r) => ({ symbol: r.symbol, change_pct: r.change_pct })),
+    top_gainers: results.filter((r) => r.change_pct != null && r.change_pct > 0).slice(0, 5).map((r) => ({ symbol: r.symbol, symbol_full: r.symbol_full, change_pct: r.change_pct })),
+    top_losers: results.filter((r) => r.change_pct != null && r.change_pct < 0).slice(-5).reverse().map((r) => ({ symbol: r.symbol, symbol_full: r.symbol_full, change_pct: r.change_pct })),
     rows: top,
+    note: 'Screener % change may be STALE if the tab was not refreshed. For live momentum use stock_momentum_screen.',
   };
 }

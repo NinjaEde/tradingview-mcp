@@ -414,3 +414,55 @@ export async function getBatchTechnicals({ symbols }) {
     note: 'Each symbol loaded on the chart individually; technicals from real bars.',
   };
 }
+
+/**
+ * Real momentum screen: load each symbol's actual bars, compute technicals,
+ * and rank by 10-day momentum (momentum_pct_10d). Unlike the TradingView
+ * Screener tab, this reads live bars so the numbers are never stale.
+ *
+ * @param {string[]} symbols - candidates to screen
+ * @param {object} [opts]
+ * @param {number} [opts.limit] - max rows to return (default 10)
+ * @param {('all'|'bullish'|'positive')} [opts.filter] - 'positive' = momentum>0, 'bullish' = bullish trend
+ * @param {('momentum'|'trend')} [opts.sort_by] - ranking key (default momentum)
+ */
+export async function getMomentumScreen({ symbols, limit = 10, filter = 'all', sort_by = 'momentum' } = {}) {
+  if (!symbols || symbols.length === 0) {
+    return { success: false, error: 'symbols list required for momentum screen' };
+  }
+
+  const tech = await getBatchTechnicals({ symbols });
+  if (!tech.success) return tech;
+
+  let rows = tech.results.filter(r => !r.error);
+
+  if (filter === 'positive') rows = rows.filter(r => (r.momentum_pct_10d ?? 0) > 0);
+  else if (filter === 'bullish') rows = rows.filter(r => r.trend === 'bullish');
+
+  rows.sort((a, b) => {
+    if (sort_by === 'trend') {
+      const rank = { bullish: 0, neutral: 1, bearish: 2 };
+      return (rank[a.trend] ?? 9) - (rank[b.trend] ?? 9);
+    }
+    return (b.momentum_pct_10d ?? -Infinity) - (a.momentum_pct_10d ?? -Infinity);
+  });
+
+  const top = limit ? rows.slice(0, limit) : rows;
+
+  return {
+    success: true,
+    source: 'real_bars',
+    sort_by,
+    filter,
+    screened: rows.length,
+    results: top.map(r => ({
+      symbol: r.symbol,
+      current_price: r.current_price,
+      trend: r.trend,
+      momentum_pct_10d: r.momentum_pct_10d,
+      change_1d_pct: r.change_1d_pct,
+      sma20: r.sma20,
+    })),
+    note: 'Ranked by real 10-day momentum from live bars. Not the TV Screener tab.',
+  };
+}

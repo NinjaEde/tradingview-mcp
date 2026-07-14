@@ -35,4 +35,14 @@ export function registerStockTools(server) {
     try { return jsonResult(await core.getBatchTechnicals({ symbols })); }
     catch (err) { return jsonResult({ success: false, error: err.message }, true); }
   });
+
+  server.tool('stock_momentum_screen', 'Real momentum screen — rank symbols by actual 10-day momentum from live bars (never stale, unlike the TV Screener tab). Returns gainers sorted by momentum_pct_10d.', {
+    symbols: z.array(z.string()).describe('Candidate symbols to screen (e.g., ["NVDA","AMD","AVGO","SAP","BAYN","SIE"])'),
+    limit: z.number().optional().describe('Max rows to return (default: 10)'),
+    filter: z.enum(['all', 'positive', 'bullish']).optional().describe('all | positive (momentum>0) | bullish (bullish trend)'),
+    sort_by: z.enum(['momentum', 'trend']).optional().describe('Ranking key (default: momentum)'),
+  }, async ({ symbols, limit, filter, sort_by }) => {
+    try { return jsonResult(await core.getMomentumScreen({ symbols, limit, filter, sort_by })); }
+    catch (err) { return jsonResult({ success: false, error: err.message }, true); }
+  });
 }
