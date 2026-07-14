@@ -86,6 +86,19 @@ for (const r of b.results) {
 }
 assert(batchOk, `batch: ${b.results.map((r) => `${r.symbol}=${r.current_price}`).join(' ')}`);
 
+// --- 5) ambiguous tickers: exchange prefix MUST pick the right instrument ---
+// 'EVT' resolves to BATS:EVT (Eaton Vance, a US fund) on TradingView's default
+// US domain, but XETR:EVT is Evotec SE (a German biotech). A bare-ticker
+// comparison would conflate them, so an exchange-prefixed request must load
+// the correct instrument and never the ambiguous default.
+console.log('\n[5] ambiguous ticker (EVT) — exchange prefix selects correct instrument:');
+const qEVT = await call('quote_get', { symbol: 'XETR:EVT' });
+const evtOk = /Evotec/.test(qEVT.description || '');
+assert(evtOk && qEVT.close != null && qEVT.close < 10, `quote_get(XETR:EVT) -> ${qEVT.symbol} ${qEVT.description} close=${qEVT.close} (Evotec, not Eaton Vance fund)`);
+const dEVT = await call('data_get_ohlcv', { symbol: 'XETR:EVT', count: 3 });
+const evtBarsOk = (dEVT.bars || []).length > 0 && (dEVT.bars || []).every((b) => b.close < 10);
+assert(evtBarsOk, `get_ohlcv(XETR:EVT) -> bars=${(dEVT.bars || []).length} lastClose=${(dEVT.bars || []).slice(-1)[0]?.close} (Evotec price range)`);
+
 console.log(`\n=== ${failures === 0 ? 'ALL PASS' : failures + ' FAILURE(S)'} ===`);
 await client.close();
 proc.kill();

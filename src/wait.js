@@ -38,20 +38,6 @@ export async function getLastBarFingerprint() {
   })()`).catch(() => null);
 }
 
-// Compares a requested symbol against the symbol TradingView actually loaded.
-// `chart.symbol()` / symbolExt().symbol can be a bare ticker ("BAS") or a
-// fully-qualified name ("XETR_DLY:BAS"). We match on the bare ticker portion
-// (after the last ':' and any "_DLY" suffix) so "BAS", "XETR:BAS" and
-// "XETR_DLY:BAS" all compare equal. TradingView sometimes prepends a digit
-// to the ticker (e.g. "BASF" -> "XETR_DLY:1BAS"); we strip a single leading
-// digit too so such resolutions still match. Returns true if they refer to
-// the same instrument.
-function symbolMatches(requested, actual) {
-  if (!requested || !actual) return false;
-  const norm = (s) => s.split(':').pop().replace(/_DLY$/, '').replace(/^[0-9]/, '').toUpperCase();
-  return norm(requested) === norm(actual);
-}
-
 // Extracts { exchange, ticker } from any TV symbol string. Handles
 // "XETR_DLY:BAS" (loaded form), "XETR:BAS" (request form), and bare "BAS".
 // The exchange part lets us tell apart ambiguous tickers that resolve to
