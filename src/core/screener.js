@@ -37,18 +37,21 @@ function normalizeHeader(label) {
   return null;
 }
 
-function parseNumberOrNull(s) {
+export function parseNumberOrNull(s) {
   if (s == null) return null;
   // Strip currency symbols, spaces, thousands separators; convert German decimals.
-  const cleaned = String(s).replace(/[^\d,.\-+%]/g, '').replace(/\./g, '').replace(',', '.');
+  // Normalize Unicode minus (U+2212) to ASCII '-' so negative numbers parse correctly.
+  const cleaned = String(s).replace(/−/g, '-').replace(/[^\d,.\-+%]/g, '').replace(/\./g, '').replace(',', '.');
   if (cleaned === '' || cleaned === '−' || cleaned === '-') return null;
   const n = parseFloat(cleaned);
   return Number.isFinite(n) ? n : null;
 }
 
-function parsePct(s) {
+export function parsePct(s) {
   if (s == null) return null;
-  const m = String(s).match(/-?[\d.,]+/);
+  // TradingView uses the Unicode minus sign (U+2212) in some locales, not ASCII '-'.
+  const normalized = String(s).replace(/−/g, '-'); // U+2212 -> ASCII hyphen-minus
+  const m = normalized.match(/-?[\d.,]+/);
   if (!m) return null;
   const n = parseFloat(m[0].replace(/\./g, '').replace(',', '.'));
   return Number.isFinite(n) ? n : null;
