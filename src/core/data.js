@@ -3,6 +3,7 @@
  */
 import { evaluate, evaluateAsync, KNOWN_PATHS, safeString } from '../connection.js';
 import { waitForChartReady } from '../wait.js';
+import { setSymbol } from './chart.js';
 
 const MAX_OHLCV_BARS = 500;
 const MAX_TRADES = 20;
@@ -134,8 +135,24 @@ function buildGraphicsJS(collectionName, mapKey, filter) {
   `;
 }
 
-export async function getOhlcv({ count, summary } = {}) {
+export async function getOhlcv({ count, summary, symbol } = {}) {
   const limit = Math.min(count || 100, MAX_OHLCV_BARS);
+  // Switch the chart to the requested symbol first so we read THAT symbol's
+  // bars, not whatever chart happens to be open. Without this, symbol is ignored.
+  if (symbol && symbol.trim()) {
+    try {
+      await setSymbol({ symbol: symbol.trim() });
+      await waitForChartReady();
+      // Verify the chart actually switched — if setSymbol failed (e.g. TV
+      // rejected the ticker), reading bars would return the WRONG symbol.
+      const active = await evaluate(`${CHART_API}.symbol()`).catch(() => null);
+      if (!active || active.toUpperCase() !== symbol.trim().toUpperCase()) {
+        throw new Error(`Chart did not switch to ${symbol} (still on ${active || 'unknown'})`);
+      }
+    } catch (e) {
+      throw new Error(`Could not load symbol ${symbol} on chart: ${e.message}`);
+    }
+  }
   let data;
   try {
     data = await evaluate(`

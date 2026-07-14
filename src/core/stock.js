@@ -11,6 +11,7 @@
  */
 import { evaluate, KNOWN_PATHS } from '../connection.js';
 import { setSymbol } from './chart.js';
+import { waitForChartReady } from '../wait.js';
 import { getOhlcv as getOhlcvCore } from './data.js';
 
 const CHART_API = KNOWN_PATHS.chartApi;
@@ -216,8 +217,6 @@ async function getActiveBars(count) {
 }
 
 // Switch the chart to `symbol`, wait for it to be ready, then read its bars.
-// setSymbol() already awaits waitForChartReady internally, so we don't
-// re-wait here — that would just add redundant latency.
 async function fetchBarsForSymbol(symbol, count, timeframe = 'D') {
   const sym = (symbol || '').trim();
   if (!sym) {
@@ -227,9 +226,15 @@ async function fetchBarsForSymbol(symbol, count, timeframe = 'D') {
   const cached = getCachedBars(sym, timeframe);
   if (cached) return cached;
   const { chart_ready } = await setSymbol({ symbol: sym });
-  if (!chart_ready) {
-    // Fallback: give the chart a short stabilisation window if waitForChartReady timed out.
-    await new Promise(r => setTimeout(r, SWITCH_DELAY_MS));
+  // Always wait for the chart to re-render the new symbol's bars, not just
+  // on the timeout path — reading bars too early reads the PREVIOUS symbol.
+  if (!chart_ready) await new Promise(r => setTimeout(r, SWITCH_DELAY_MS));
+  await waitForChartReady();
+  // If the chart still isn't on `sym` after retries, fail loudly instead of
+  // returning the WRONG symbol's bars (stale-cache bug class).
+  const active = await evaluate(`${CHART_API}.symbol()`).catch(() => null);
+  if (!active || active.toUpperCase() !== sym.toUpperCase()) {
+    throw new Error(`Chart did not switch to ${sym} (still on ${active || 'unknown'})`);
   }
   const bars = getActiveBars(count);
   setCachedBars(sym, timeframe, bars);

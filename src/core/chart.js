@@ -38,19 +38,27 @@ export async function getState({ _deps } = {}) {
 }
 
 export async function setSymbol({ symbol, _deps }) {
-  const { evaluateAsync, waitForChartReady } = _resolve(_deps);
-  await evaluateAsync(`
-    (function() {
-      var chart = ${CHART_API};
-      return new Promise(function(resolve) {
-        chart.setSymbol(${safeString(symbol)}, {});
-        resolve();
-      });
-    })()
-  `);
-  // waitForChartReady already confirms the symbol switched + bars are stable,
-  // so no blind setTimeout is needed here.
-  const ready = await waitForChartReady(symbol);
+  // _deps is optional: callers that import setSymbol directly (getOhlcv,
+  // fetchBarsForSymbol) don't thread it. Fall back to direct imports.
+  const { evaluateAsync, waitForChartReady } = _deps
+    ? _resolve(_deps)
+    : { evaluateAsync: _evaluateAsync, waitForChartReady: _waitForChartReady };
+  let ready = false;
+  // Retry: TradingView sometimes takes >1 switch attempt, especially
+  // when the chart is mid-render. Without retry a single timeout
+  // leaves us reading the PREVIOUS symbol's bars.
+  for (let attempt = 0; attempt < 3 && !ready; attempt++) {
+    await evaluateAsync(`
+      (function() {
+        var chart = ${CHART_API};
+        return new Promise(function(resolve) {
+          chart.setSymbol(${safeString(symbol)}, {});
+          resolve();
+        });
+      })()
+    `);
+    ready = await waitForChartReady(symbol);
+  }
   return { success: true, symbol, chart_ready: ready };
 }
 
