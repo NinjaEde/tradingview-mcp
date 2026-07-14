@@ -146,10 +146,13 @@ export async function getOhlcv({ count, summary, symbol } = {}) {
       // symbol (via symbolExt) with present+stable bars. Re-check here as a
       // hard guard: if it still reports the wrong symbol, fail loudly
       // instead of returning the wrong symbol's bars.
-      const active = await evaluate(`(function(){ try { return (${CHART_API}.symbolExt()||{}).symbol || ${CHART_API}.symbol(); } catch(e){ return null; } })()`).catch(() => null);
-      const norm = (s) => (s || '').split(':').pop().replace(/_DLY$/, '').replace(/^[0-9]/, '').toUpperCase();
-      if (!active || norm(active) !== norm(symbol.trim())) {
-        throw new Error(`Chart did not switch to ${symbol} (still on ${active || 'unknown'})`);
+      const active = await evaluate(`(function(){ try { var se=(${CHART_API}.symbolExt()||{}); return { sym: se.symbol||${CHART_API}.symbol(), full: se.full_name||'' }; } catch(e){ return null; } })()`).catch(() => null);
+      const bare = (s) => (s || '').split(':').pop().replace(/_DLY$/, '').replace(/^[0-9]/, '').toUpperCase();
+      const parseExch = (s) => s && s.includes(':') ? s.split(':')[0].replace(/_DLY$/, '').toUpperCase() : null;
+      const ok = active && bare(active.sym) === bare(symbol.trim()) &&
+        (!parseExch(symbol.trim()) || !parseExch(active.full) || parseExch(symbol.trim()) === parseExch(active.full));
+      if (!ok) {
+        throw new Error(`Chart did not switch to ${symbol} (still on ${active ? (active.full || active.sym) : 'unknown'})`);
       }
     } catch (e) {
       throw new Error(`Could not load symbol ${symbol} on chart: ${e.message}`);

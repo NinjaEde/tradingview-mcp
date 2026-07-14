@@ -52,6 +52,38 @@ function symbolMatches(requested, actual) {
   return norm(requested) === norm(actual);
 }
 
+// Extracts { exchange, ticker } from any TV symbol string. Handles
+// "XETR_DLY:BAS" (loaded form), "XETR:BAS" (request form), and bare "BAS".
+// The exchange part lets us tell apart ambiguous tickers that resolve to
+// DIFFERENT instruments per exchange (e.g. "EVT" -> BATS:EVT = Eaton Vance
+// fund, but XETR_DLY:EVT = Evotec SE). Bare tickers (no exchange) are treated
+// as exchange-agnostic.
+function parseSymbol(s) {
+  if (!s) return { exchange: null, ticker: '' };
+  const ticker = s.split(':').pop().replace(/_DLY$/, '').replace(/^[0-9]/, '').toUpperCase();
+  const exch = s.includes(':') ? s.split(':')[0].replace(/_DLY$/, '').toUpperCase() : null;
+  return { exchange: exch, ticker };
+}
+
+// Compares a requested symbol against the ACTUALLY-LOADED symbol, exchange-
+// aware. This is the reliable check: symbolExt().symbol returns only the bare
+// ticker ("EVT") for BOTH Eaton Vance (BATS:EVT) and Evotec (XETR_DLY:EVT), so
+// a bare-ticker compare would wrongly match. We compare the exchange too:
+//   - if the request has no exchange, match on ticker alone (exchange-agnostic)
+//   - if the request HAS an exchange, the loaded symbol must carry the same
+//     exchange (so "XETR:EVT" matches XETR_DLY:EVT = Evotec, NOT BATS:EVT).
+function symbolMatchesExchangeAware(requested, loadedSymbol, loadedFullName) {
+  if (!requested) return false;
+  const req = parseSymbol(requested);
+  // Prefer the fully-qualified name (XETR_DLY:EVT) when available; fall back
+  // to the bare symbolExt().symbol.
+  const loaded = loadedFullName || loadedSymbol || '';
+  const act = parseSymbol(loaded);
+  if (req.ticker !== act.ticker) return false;
+  if (req.exchange && act.exchange && req.exchange !== act.exchange) return false;
+  return true;
+}
+
 export async function waitForChartReady(expectedSymbol = null, expectedTf = null, timeout = DEFAULT_TIMEOUT, prevFingerprint = null) {
   const start = Date.now();
   let lastBarCount = -1;
@@ -78,11 +110,12 @@ export async function waitForChartReady(expectedSymbol = null, expectedTf = null
         // signal — chart.symbol() can lag or report the requested-but-not-yet-
         // loaded ticker during a switch.
         var symExt = '';
-        try { symExt = (chart.symbolExt() || {}).symbol || ''; } catch (e) {}
+        var symFullName = '';
+        try { var se = chart.symbolExt() || {}; symExt = se.symbol || ''; symFullName = se.full_name || ''; } catch (e) {}
         var lastBar = null;
         var fp = null;
         try { var li = bars.lastIndex(); var v = li >= 0 ? bars.valueAt(li) : null; if (v) { lastBar = { time: v[0], close: v[4] }; fp = v[0] + '|' + v[4]; } } catch (e) {}
-        return { ready: size > 0, barCount: size, symbol: sym, symbolExt: symExt, lastBar: lastBar, fingerprint: fp };
+        return { ready: size > 0, barCount: size, symbol: sym, symbolExt: symExt, symbolFullName: symFullName, lastBar: lastBar, fingerprint: fp };
       } catch (e) {
         return { ready: false, error: e.message };
       }
@@ -99,7 +132,12 @@ export async function waitForChartReady(expectedSymbol = null, expectedTf = null
     // ticker. If bars are momentarily null (TV clears them during reload),
     // keep waiting — that's the chart mid-switch.
     if (expectedSymbol) {
-      if (!symbolMatches(expectedSymbol, state.symbolExt)) {
+      // Exchange-aware compare: symbolExt().symbol returns only the bare
+      // ticker (e.g. "EVT") for BOTH Eaton Vance (BATS:EVT) and Evotec
+      // (XETR_DLY:EVT), so a bare-ticker compare would wrongly match. Use the
+      // fully-qualified full_name (XETR_DLY:EVT) so an exchange-qualified
+      // request like "XETR:EVT" matches Evotec, not the US fund.
+      if (!symbolMatchesExchangeAware(expectedSymbol, state.symbolExt, state.symbolFullName)) {
         stableCount = 0;
         await new Promise(r => setTimeout(r, POLL_INTERVAL));
         continue;

@@ -234,10 +234,13 @@ async function fetchBarsForSymbol(symbol, count, timeframe = 'D') {
   // returning the WRONG symbol's bars (stale-cache bug class). Verify against
   // symbolExt().symbol (the actually-loaded instrument), not chart.symbol()
   // which can lag mid-switch.
-  const active = await evaluate(`(function(){ try { return (${CHART_API}.symbolExt()||{}).symbol || ${CHART_API}.symbol(); } catch(e){ return null; } })()`).catch(() => null);
-  const norm = (s) => (s || '').split(':').pop().replace(/_DLY$/, '').replace(/^[0-9]/, '').toUpperCase();
-  if (!active || norm(active) !== norm(sym)) {
-    throw new Error(`Chart did not switch to ${sym} (still on ${active || 'unknown'})`);
+  const active = await evaluate(`(function(){ try { var se=(${CHART_API}.symbolExt()||{}); return { sym: se.symbol||${CHART_API}.symbol(), full: se.full_name||'' }; } catch(e){ return null; } })()`).catch(() => null);
+  const bare = (s) => (s || '').split(':').pop().replace(/_DLY$/, '').replace(/^[0-9]/, '').toUpperCase();
+  const parseExch = (s) => s && s.includes(':') ? s.split(':')[0].replace(/_DLY$/, '').toUpperCase() : null;
+  const ok = active && bare(active.sym) === bare(sym) &&
+    (!parseExch(sym) || !parseExch(active.full) || parseExch(sym) === parseExch(active.full));
+  if (!ok) {
+    throw new Error(`Chart did not switch to ${sym} (still on ${active ? (active.full || active.sym) : 'unknown'})`);
   }
   const bars = getActiveBars(count);
   setCachedBars(sym, timeframe, bars);
