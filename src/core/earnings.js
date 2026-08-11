@@ -1,46 +1,44 @@
 /**
- * Earnings check — warns about upcoming earnings for a list of symbols.
+ * Earnings check via TradingView earnings calendar web scraping.
+ * Runs in Node.js context (not CDP evaluate), fetching the page directly.
  */
 export async function checkEarnings({ symbols }) {
   if (!symbols || !Array.isArray(symbols) || symbols.length === 0) {
     throw new Error('symbols required: array of ticker strings');
   }
 
-  // TradingView has an earnings calendar at tradingview.com/earnings-calendar/
-  // We scrape it via CDP for the next 7 days
-  const results = [];
-
   try {
-    const { evaluate } = await import('../connection.js');
+    const resp = await fetch('https://www.tradingview.com/earnings-calendar/', {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
+        'Accept': 'text/html',
+      },
+    });
+    const text = await resp.text();
 
-    // Navigate to earnings calendar and scrape upcoming earnings
-    const data = await evaluate(`(async function() {
-      try {
-        var resp = await fetch('https://www.tradingview.com/earnings-calendar/', { credentials: 'include' });
-        var text = await resp.text();
-        // Extract earnings data from the page
-        var symbols = ${JSON.stringify(symbols)};
-        var found = {};
-        for (var i = 0; i < symbols.length; i++) {
-          var s = symbols[i];
-          var re = new RegExp(s + '[\\\\s\\\\S]{0,200}(\\\\d{1,2}\\\\.\\\\s*[A-Z][a-z]+\\\\s*\\\\d{4}|[A-Z][a-z]+\\\\s+\\\\d{1,2}\\\\,?\\\\s+\\\\d{4})', 'i');
-          var m = text.match(re);
-          if (m) found[s] = { date: m[1], hasEarnings: true };
-        }
-        return { raw: Object.keys(found).length > 0 ? found : {}, fullLength: text.length };
-      } catch(e) { return { error: e.message }; }
-    })()`, { awaitPromise: true });
+    const results = [];
+    const nextWeek = new Date();
+    nextWeek.setDate(nextWeek.getDate() + 7);
 
-    if (data?.raw && Object.keys(data.raw).length > 0) {
-      for (const [sym, info] of Object.entries(data.raw)) {
-        results.push({ symbol: sym, earningsDate: info.date, warning: '⚠️ Earnings in den nächsten Tagen' });
+    for (const sym of symbols) {
+      // Look for the symbol near the current/upcoming date range
+      const upper = sym.toUpperCase();
+      const escaped = upper.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      // Match the ticker in context of earnings date information
+      const re = new RegExp(`${escaped}[\\s\\S]{0,300}(\\d{1,2}\\.\\s*[A-Z][a-z]+\\s*\\d{4})`, 'i');
+      const m = text.match(re);
+      if (m) {
+        results.push({
+          symbol: sym,
+          earningsDate: m[1],
+          warning: '⚠️ Earnings in den nächsten Tagen',
+        });
       }
     }
 
-    // If no results from scraping, return unchecked
     for (const sym of symbols) {
       if (!results.find(r => r.symbol === sym)) {
-        results.push({ symbol: sym, earningsDate: null, warning: 'Keine Earnings in nächster Woche erkannt' });
+        results.push({ symbol: sym, warning: 'OK — keine Earnings erkannt' });
       }
     }
 
@@ -49,15 +47,13 @@ export async function checkEarnings({ symbols }) {
       symbolsChecked: symbols.length,
       earningsFound: results.filter(r => r.earningsDate).length,
       results,
-      note: 'Earnings-Daten von TradingView Earnings Calendar. Nur die nächsten ~7 Tage werden geprüft.',
+      note: 'Grobe Earnings-Prüfung (Web-Scraping). Bei Unsicherheit: tradingview.com/earnings-calendar/ manuell prüfen.',
     };
   } catch (e) {
     return {
-      success: true,
-      symbolsChecked: symbols.length,
-      earningsFound: 0,
-      results: symbols.map(s => ({ symbol: s, warning: e.message })),
-      note: 'Earnings-Check fehlgeschlagen. Prüfe manuell auf tradingview.com/earnings-calendar/',
+      success: false,
+      error: e.message,
+      symbols: symbols.map(s => ({ symbol: s, warning: 'Prüfung fehlgeschlagen' })),
     };
   }
 }

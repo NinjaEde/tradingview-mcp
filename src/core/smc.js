@@ -37,7 +37,7 @@ function parseSMCTable(rows) {
       result.structure = cols[0]; result.pattern = cols[1];
       result.divergence = cols[2]; result.liquidity = cols[3];
     }
-    else if (row.includes('RSI')) result.rsi = parseFloat(cols[1]);
+    else if (row.includes('RSI')) result.rsi = parseFloat(cols[cols.length - 1]) || parseFloat(cols[1]) || null;
     else if (row.includes('Vol Trend')) result.volTrend = cols[1];
     else if (row.includes('1.Bullish')) result.checkBullish = cols[1] === 'Y';
     else if (row.includes('2.EMA')) result.checkEMA = cols[1] === 'Y';

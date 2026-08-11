@@ -2,7 +2,7 @@
  * Portfolio health check — verifies positions against live prices, stops and targets.
  */
 import os from 'os';
-import { getClient, evaluate, evaluateAsync, safeString } from '../connection.js';
+import { evaluate, safeString } from '../connection.js';
 
 const JOURNAL_DIR = os.homedir() + '/Trading-Journal/wiki/';
 
@@ -38,16 +38,16 @@ export async function getPortfolioHealth({ positions }) {
       // Store original symbol first
       const origSym = await evaluate(`(function(){try{var c=window.TradingViewApi._activeChartWidgetWV.value()._chartWidget;return c.model().mainSeries().symbol();}catch(e){return null;}})()`);
 
-      // Switch to position symbol
-      await evaluate(`(function(){var c=window.TradingViewApi._activeChartWidgetWV.value()._chartWidget;c.setSymbol(${safeString(tv)});})()`);
-      await new Promise(r => setTimeout(r, 2500));
+      // Switch to position symbol (use the same API as chart_set_symbol)
+      await evaluate(`(function(){var c=window.TradingViewApi._activeChartWidgetWV.value()._chartWidget;c.setSymbol(${safeString(tv)},{});})()`);
+      await new Promise(r => setTimeout(r, 3000));
 
       // Get price
       const priceData = await evaluate(`(function(){try{var bars=window.TradingViewApi._activeChartWidgetWV.value()._chartWidget.model().mainSeries().bars();var l=bars[bars.length-1];return{price:l.close};}catch(e){return null;}})()`);
 
       // Restore
       if (origSym) {
-        await evaluate(`(function(){var c=window.TradingViewApi._activeChartWidgetWV.value()._chartWidget;c.setSymbol(${safeString(origSym)});})()`);
+        await evaluate(`(function(){var c=window.TradingViewApi._activeChartWidgetWV.value()._chartWidget;c.setSymbol(${safeString(origSym)},{});})()`);
         await new Promise(r => setTimeout(r, 2000));
       }
 
