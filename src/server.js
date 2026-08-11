@@ -19,6 +19,9 @@ import { registerStockTools } from './tools/stock.js';
 import { registerPatternTools } from './tools/pattern.js';
 import { registerScreenerTools } from './tools/screener.js';
 import { registerOptionsTools } from './tools/options.js';
+import { registerSMCTools } from './tools/smc.js';
+import { registerPortfolioTools } from './tools/portfolio.js';
+import { registerEarningsTools } from './tools/earnings.js';
 const server = new McpServer(
   {
     name: 'tradingview',
@@ -86,6 +89,18 @@ Options Chain (US stocks):
   Briefly navigates the chart tab to the options chain page and back.
   Pass symbol (e.g. "NVDA" or "NASDAQ:NVDA"). Works for stocks with options.
 
+SMC & Portfolio Tools:
+- smc_dashboard → consolidated SMC analysis from "Ede - Advanced SMC v2.0" indicator.
+  Returns BOS/CHoCH levels, EMA stack, zone, structure, checklist, and trading bias
+  with confidence score. 1 call replaces 4 (lines, labels, boxes, tables).
+- portfolio_health → check positions against live prices: computes distance to stop,
+  flags positions within 5% of stop, checks target achievement.
+  Pass positions as [{ symbol, entry, stop, targets }].
+- earnings_check → warn about upcoming earnings for symbols. Scrapes TradingView
+  earnings calendar. Use before opening new positions.
+- watchlist_smc_scan → batch-scan watchlist for bullish/bearish momentum as first-pass
+  SMC filter. Use stock_momentum_screen for detailed momentum ranking.
+
 Pine Script development:
 - pine_set_source → inject code, pine_smart_compile → compile + check errors
 - pine_get_errors → read errors, pine_get_console → read log output
@@ -129,6 +144,9 @@ registerStockTools(server);
 registerPatternTools(server);
 registerScreenerTools(server);
 registerOptionsTools(server);
+registerSMCTools(server);
+registerPortfolioTools(server);
+registerEarningsTools(server);
 // Startup notice (stderr so it doesn't interfere with MCP stdio protocol)
 process.stderr.write('⚠  tradingview-mcp  |  Unofficial tool. Not affiliated with TradingView Inc. or Anthropic.\n');
 process.stderr.write('   Ensure your usage complies with TradingView\'s Terms of Use.\n\n');

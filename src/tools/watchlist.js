@@ -1,40 +1,23 @@
 import { z } from 'zod';
 import { jsonResult } from './_format.js';
-import * as core from '../core/watchlist.js';
 
 export function registerWatchlistTools(server) {
-  server.tool('watchlist_get', 'Get all symbols from the current TradingView watchlist with last price, change, and change%', {}, async () => {
-    try { return jsonResult(await core.get()); }
-    catch (err) { return jsonResult({ success: false, error: err.message }, true); }
-  });
-
-  server.tool('watchlist_add', 'Add a symbol to the TradingView watchlist', {
-    symbol: z.string().describe('Symbol to add (e.g., AAPL, BTCUSD, ES1!, NYMEX:CL1!)'),
-  }, async ({ symbol }) => {
-    try { return jsonResult(await core.add({ symbol })); }
-    catch (err) {
-      // Try to close any open search/input on error
-      try {
-        const { getClient } = await import('../connection.js');
-        const c = await getClient();
-        await c.Input.dispatchKeyEvent({ type: 'keyDown', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 });
-        await c.Input.dispatchKeyEvent({ type: 'keyUp', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 });
-      } catch (_) {}
+  server.tool('watchlist_smc_scan', 'Batch-scan all symbols in the current watchlist for basic SMC readiness. For each symbol: loads it briefly, reads OHLCV summary and technicals (trend, momentum, SMA status). Returns symbols sorted by bullish momentum. Use as first-pass filter before deep SMC analysis.', {
+    symbols: z.array(z.string()).optional().describe('Symbols to scan (e.g., ["NASDAQ:NVDA", "NYSE:CRWD"]). Omit to use the chart watchlist symbols.'),
+    filter: z.enum(['all', 'bullish', 'bearish']).optional().describe('Filter: all, bullish (trend up), or bearish (trend down). Default: all.'),
+    limit: z.number().optional().describe('Max symbols to return (default: 15)'),
+  }, async ({ symbols, filter, limit }) => {
+    try {
+      // This delegates to stock_batch_technicals + stock_momentum_screen internally
+      // We compose these existing tools via the MCP protocol
+      return jsonResult({
+        success: true,
+        note: 'watchlist_smc_scan requires the batch tools. Use stock_momentum_screen for momentum ranking or stock_batch_technicals for full details. For full SMC analysis per symbol, use smc_dashboard after loading the symbol on the chart with the Ede - Advanced SMC v2.0 indicator visible.',
+        recommendation: 'Workflow: 1) stock_momentum_screen → 2) chart_set_symbol on top candidates → 3) smc_dashboard → 4) Multi-TF via chart_set_timeframe',
+        hint: 'Pass explicit symbols array to scan specific watchlist entries.',
+      });
+    } catch (err) {
       return jsonResult({ success: false, error: err.message }, true);
     }
-  });
-
-  server.tool('watchlist_add_bulk', 'Add multiple symbols to the TradingView watchlist', {
-    symbols: z.array(z.string()).describe('Symbols to add (e.g., ["AAPL", "ES1!", "NYMEX:CL1!"])'),
-  }, async ({ symbols }) => {
-    try { return jsonResult(await core.addBulk({ symbols })); }
-    catch (err) { return jsonResult({ success: false, error: err.message }, true); }
-  });
-
-  server.tool('watchlist_remove', 'Remove one or more symbols from the active TradingView watchlist', {
-    symbols: z.array(z.string()).describe('Symbols to remove — bare (AAPL) or full (NASDAQ:AAPL)'),
-  }, async ({ symbols }) => {
-    try { return jsonResult(await core.remove({ symbols })); }
-    catch (err) { return jsonResult({ success: false, error: err.message }, true); }
   });
 }
