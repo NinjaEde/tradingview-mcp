@@ -18,6 +18,7 @@ import { registerBacktestTools } from './tools/backtest.js';
 import { registerStockTools } from './tools/stock.js';
 import { registerPatternTools } from './tools/pattern.js';
 import { registerScreenerTools } from './tools/screener.js';
+import { registerOptionsTools } from './tools/options.js';
 const server = new McpServer(
   {
     name: 'tradingview',
@@ -79,6 +80,12 @@ Fundamental Data (requires Premium):
 - stock_get_earnings → EPS history, estimates, surprise %
 - stock_get_dividends → yield, growth, history
 
+Options Chain (US stocks):
+- options_get → full options chain: strikes, bid/ask, greeks (delta/gamma/theta/vega/rho),
+  IV, volume, OI, plus computed ATM straddle price and IV metrics by expiration.
+  Briefly navigates the chart tab to the options chain page and back.
+  Pass symbol (e.g. "NVDA" or "NASDAQ:NVDA"). Works for stocks with options.
+
 Pine Script development:
 - pine_set_source → inject code, pine_smart_compile → compile + check errors
 - pine_get_errors → read errors, pine_get_console → read log output
@@ -121,6 +128,7 @@ registerBacktestTools(server);
 registerStockTools(server);
 registerPatternTools(server);
 registerScreenerTools(server);
+registerOptionsTools(server);
 // Startup notice (stderr so it doesn't interfere with MCP stdio protocol)
 process.stderr.write('⚠  tradingview-mcp  |  Unofficial tool. Not affiliated with TradingView Inc. or Anthropic.\n');
 process.stderr.write('   Ensure your usage complies with TradingView\'s Terms of Use.\n\n');
